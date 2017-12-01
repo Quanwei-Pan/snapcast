@@ -17,6 +17,11 @@
 VERSION = 0.12.0
 BIN = snapclient
 
+ifeq ($(TARGET), ARM)
+INC_PATH = ${SNAPCAST_INC_PATH}
+LIB_PATH = ${SNAPCAST_LIB_PATH}
+endif
+
 ifeq ($(TARGET), FREEBSD)
 SHELL   = /usr/local/bin/bash
 else
@@ -31,7 +36,7 @@ else
 endif
 
 
-CXXFLAGS += $(ADD_CFLAGS) -std=c++0x -Wall -Wno-unused-function -O3 -DASIO_STANDALONE -DVERSION=\"$(VERSION)\" -I. -I.. -isystem ../externals/asio/asio/include -I../externals/popl/include -I../externals/aixlog/include
+CXXFLAGS += $(ADD_CFLAGS) -std=c++0x -Wall -Wno-unused-function -O3 -DASIO_STANDALONE -DVERSION=\"$(VERSION)\" -I. -I.. -isystem ../externals/asio/asio/include -I../externals/popl/include -I../externals/aixlog/include -I../externals
 LDFLAGS   = -logg -lFLAC
 OBJ       = snapClient.o stream.o clientConnection.o timeProvider.o player/player.o decoder/pcmDecoder.o decoder/oggDecoder.o decoder/flacDecoder.o controller.o ../message/pcmChunk.o ../common/sampleFormat.o
 
@@ -72,6 +77,14 @@ STRIP     = strip
 CXXFLAGS += -DHAS_OGG -DHAS_COREAUDIO -DFREEBSD -DHAS_BONJOUR -DHAS_DAEMON -I/usr/local/include -Wno-unused-local-typedef -Wno-deprecated
 LDFLAGS  += -lvorbis -lFLAC -L/usr/local/lib -framework AudioToolbox -framework CoreFoundation -framework IOKit
 OBJ      += ../common/daemon.o player/coreAudioPlayer.o browseZeroConf/browseBonjour.o
+
+else ifeq ($(TARGET), ARM)
+
+CXX       = ${CROSS_COMPILE}g++
+STRIP     = ${CROSS_COMPILE}strip
+CXXFLAGS += -I${INC_PATH} -pthread -DNO_CPP11_STRING -DHAS_TREMOR -DHAS_ALSA -DHAS_AVAHI -DHAS_DAEMON
+LDFLAGS  += -L${LIB_PATH} -ldl -lasound -ldbus-1 -lopus -lvorbisidec -lavahi-client -lavahi-common -latomic 
+OBJ      += ../common/daemon.o player/alsaPlayer.o browseZeroConf/browseAvahi.o
 
 else
 

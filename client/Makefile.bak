@@ -15,12 +15,7 @@
 #   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 VERSION = 0.12.0
-BIN = snapserver
-
-ifeq ($(TARGET), ARM)
-INC_PATH = ${SNAPCAST_INC_PATH}
-LIB_PATH = ${SNAPCAST_LIB_PATH}
-endif
+BIN = snapclient
 
 ifeq ($(TARGET), FREEBSD)
 SHELL   = /usr/local/bin/bash
@@ -36,9 +31,9 @@ else
 endif
 
 
-CXXFLAGS += $(ADD_CFLAGS) -std=c++0x -Wall -Wno-unused-function -O3 -DASIO_STANDALONE -DVERSION=\"$(VERSION)\" -I. -I.. -isystem ../externals/asio/asio/include -I../externals/popl/include -I../externals/aixlog/include -I../externals/jsonrpcpp/lib -I../externals
-LDFLAGS   = -lvorbis -lvorbisenc -logg -lFLAC
-OBJ       = snapServer.o config.o controlServer.o controlSession.o streamServer.o streamSession.o streamreader/streamUri.o streamreader/streamManager.o streamreader/pcmStream.o streamreader/pipeStream.o streamreader/fileStream.o streamreader/processStream.o streamreader/airplayStream.o streamreader/spotifyStream.o streamreader/watchdog.o encoder/encoderFactory.o encoder/flacEncoder.o encoder/pcmEncoder.o encoder/oggEncoder.o ../common/sampleFormat.o ../message/pcmChunk.o ../externals/jsonrpcpp/lib/jsonrp.o
+CXXFLAGS += $(ADD_CFLAGS) -std=c++0x -Wall -Wno-unused-function -O3 -DASIO_STANDALONE -DVERSION=\"$(VERSION)\" -I. -I.. -isystem ../externals/asio/asio/include -I../externals/popl/include -I../externals/aixlog/include
+LDFLAGS   = -logg -lFLAC
+OBJ       = snapClient.o stream.o clientConnection.o timeProvider.o player/player.o decoder/pcmDecoder.o decoder/oggDecoder.o decoder/flacDecoder.o controller.o ../message/pcmChunk.o ../common/sampleFormat.o
 
 
 ifneq (,$(TARGET))
@@ -51,54 +46,64 @@ endif
 
 ifeq ($(TARGET), ANDROID)
 
-CXX       = $(NDK_DIR)/bin/arm-linux-androideabi-g++
-STRIP     = $(NDK_DIR)/bin/arm-linux-androideabi-strip
-CXXFLAGS += -pthread -DNO_CPP11_STRING -fPIC -I$(NDK_DIR)/include
-LDFLAGS  += -L$(NDK_DIR)/lib -pie -llog -latomic
+CXX       = $(PROGRAM_PREFIX)clang++
+STRIP     = $(PROGRAM_PREFIX)strip
+CXXFLAGS += -pthread -DNO_CPP11_STRING -fPIC -DHAS_TREMOR -DHAS_OPENSL -I$(NDK_DIR)/include
+LDFLAGS   = -L$(NDK_DIR)/lib -pie -lvorbisidec -logg -lFLAC -lOpenSLES -latomic -llog
+OBJ      += player/openslPlayer.o 
 
 else ifeq ($(TARGET), OPENWRT)
 
 STRIP     = echo
-CXXFLAGS += -DNO_CPP11_STRING -DHAS_AVAHI -DHAS_DAEMON -pthread
-LDFLAGS  += -lavahi-client -lavahi-common -latomic
-OBJ      += ../common/daemon.o publishZeroConf/publishAvahi.o 
+CXXFLAGS += -pthread -DNO_CPP11_STRING -DHAS_TREMOR -DHAS_ALSA -DHAS_AVAHI -DHAS_DAEMON
+LDFLAGS  += -lasound -lvorbisidec -lavahi-client -lavahi-common -latomic
+OBJ      += ../common/daemon.o player/alsaPlayer.o browseZeroConf/browseAvahi.o
 
-else ifeq ($(TARGET), FREEBSD)
+else ifeq ($(TARGET), BUILDROOT)
 
-CXX       = g++
-STRIP     = echo
-CXXFLAGS += -DNO_CPP11_STRING -DHAS_AVAHI -DHAS_DAEMON -pthread
-LDFLAGS  += -lrt -lavahi-client -lavahi-common -static-libgcc -static-libstdc++ -latomic
-OBJ      += ../common/daemon.o publishZeroConf/publishAvahi.o 
+CXXFLAGS += -pthread -DNO_CPP11_STRING -DHAS_TREMOR -DHAS_ALSA -DHAS_AVAHI -DHAS_DAEMON
+LDFLAGS  += -lasound -lvorbisidec -lavahi-client -lavahi-common -latomic
+OBJ      += ../common/daemon.o player/alsaPlayer.o browseZeroConf/browseAvahi.o
 
 else ifeq ($(TARGET), MACOS)
 
 CXX       = g++
 STRIP     = strip
-CXXFLAGS += -DFREEBSD -DHAS_BONJOUR -DHAS_DAEMON -Wno-deprecated -I/usr/local/include
-LDFLAGS  += -L/usr/local/lib -framework CoreFoundation -framework IOKit
-OBJ      += ../common/daemon.o publishZeroConf/publishBonjour.o
-
-else ifeq ($(TARGET), ARM)
-
-CXX       = ${CROSS_COMPILE}g++
-STRIP     = ${CROSS_COMPILE}strip
-CXXFLAGS += -I${INC_PATH} -DNO_CPP11_STRING -DHAS_AVAHI -DHAS_DAEMON -pthread
-LDFLAGS  += -L${LIB_PATH} -ldl -lasound -ldbus-1 -lopus -lvorbisidec -lavahi-client -lavahi-common -latomic 
-OBJ      += ../common/daemon.o publishZeroConf/publishAvahi.o
+CXXFLAGS += -DHAS_OGG -DHAS_COREAUDIO -DFREEBSD -DHAS_BONJOUR -DHAS_DAEMON -I/usr/local/include -Wno-unused-local-typedef -Wno-deprecated
+LDFLAGS  += -lvorbis -lFLAC -L/usr/local/lib -framework AudioToolbox -framework CoreFoundation -framework IOKit
+OBJ      += ../common/daemon.o player/coreAudioPlayer.o browseZeroConf/browseBonjour.o
 
 else
 
-CXX       = $g++
+CXX       = g++
 STRIP     = strip
-CXXFLAGS += -DHAS_AVAHI -DHAS_DAEMON -pthread
-LDFLAGS   = -lrt -lvorbis -lvorbisenc -logg -lFLAC -lavahi-client -lavahi-common -static-libgcc -static-libstdc++
-OBJ      += ../common/daemon.o publishZeroConf/publishAvahi.o 
+CXXFLAGS += -pthread -DHAS_OGG -DHAS_ALSA -DHAS_AVAHI -DHAS_DAEMON
+LDFLAGS  += -lrt -lasound -lvorbis -lavahi-client -lavahi-common -static-libgcc -static-libstdc++ -latomic
+OBJ      += ../common/daemon.o player/alsaPlayer.o browseZeroConf/browseAvahi.o
 
 endif
 
 
-all:	$(BIN)
+all:	check-env $(BIN)
+
+check-env:
+ifeq ($(TARGET), ANDROID)
+ifndef NDK_DIR
+	$(error android NDK_DIR is not set)
+endif
+ifndef ARCH
+	$(error ARCH is not set (arm, mips, x86))
+endif
+ifeq ($(ARCH), x86)
+	$(eval PROGRAM_PREFIX:=$(NDK_DIR)/bin/i686-linux-android-)
+else ifeq ($(ARCH), mips)
+	$(eval CXXFLAGS:=$(CXXFLAGS) -DIS_BIG_ENDIAN)
+	$(eval PROGRAM_PREFIX:=$(NDK_DIR)/bin/mipsel-linux-android-)
+else
+	$(eval CXXFLAGS:=$(CXXFLAGS) -march=armv7)
+	$(eval PROGRAM_PREFIX:=$(NDK_DIR)/bin/arm-linux-androideabi-)
+endif
+endif
 
 $(BIN): $(OBJ)
 	$(CXX) $(CXXFLAGS) -o $(BIN) $(OBJ) $(LDFLAGS)
@@ -108,7 +113,7 @@ $(BIN): $(OBJ)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(BIN) $(OBJ) *~
+	rm -rf $(BIN) $(OBJ) *~ player/*.o
 
 .PHONY: dpkg
 #sudo apt-get install build-essential debhelper dh-make dh-systemd quilt fakeroot lintian
@@ -120,14 +125,6 @@ ifdef DESTDIR
 
 install:
 	$(MAKE) installfiles
-
-else ifeq ($(TARGET), FREEBSD)
-
-install:
-	echo BSD
-	install -g wheel -o root -m 555 $(BIN) $(TARGET_DIR)/local/bin/$(BIN)
-	install -g wheel -o root -m 555 $(BIN).1 $(TARGET_DIR)/local/man/man1/$(BIN).1
-	install -g wheel -o root -m 555 debian/$(BIN).bsd $(TARGET_DIR)/local/etc/rc.d/$(BIN)
 
 else ifeq ($(TARGET), MACOS)
 
@@ -143,7 +140,7 @@ else
 install:
 	$(MAKE) adduser
 	$(MAKE) installfiles
-	install -g snapserver -o snapserver -d /var/run/$(BIN)
+	install -g audio -o snapclient -d /var/run/$(BIN)
 
 	@if [[ `systemctl` =~ -\.mount ]]; then \
 		$(MAKE) installsystemd; \
@@ -176,27 +173,12 @@ installsysv:
 	update-rc.d $(BIN) defaults; \
 	/etc/init.d/$(BIN) start; \
 
-installbsd:
-	@echo using bsd; \
-	cp debian/$(BIN).bsd /usr/local/etc/rc.d/$(BIN); \
-
 adduser:
-	@if ! getent passwd snapserver >/dev/null; then \
-		useradd --user-group --system --home-dir /var/lib/snapserver snapserver; \
+	@if ! getent passwd snapclient >/dev/null; then \
+		useradd --gid audio --system snapclient; \
 	fi; \
 
-
-ifeq ($(TARGET), FREEBSD)
-
-uninstall:
-	@service $(BIN) stop; \
-	killall -9 $(BIN); \
-	rm -f $(TARGET_DIR)/local/bin/$(BIN); \
-	rm -f $(TARGET_DIR)/local/man/man1/$(BIN).1; \
-	rm -f $(TARGET_DIR)/local/etc/rc.d/$(BIN); \
-	rm -rf /var/lib/snapserver; \
-
-else ifeq ($(TARGET), MACOS)
+ifeq ($(TARGET), MACOS)
 
 uninstall:
 	@launchctl unload /Library/LaunchAgents/de.badaix.snapcast.$(BIN).plist; \
@@ -204,7 +186,6 @@ uninstall:
 	rm -f $(TARGET_DIR)/local/bin/$(BIN); \
 	rm -f $(TARGET_DIR)/local/share/man/man1/$(BIN).1; \
 	rm -f /Library/LaunchAgents/de.badaix.snapcast.$(BIN).plist; \
-	rm -rf /var/lib/snapserver; \
 
 else
 
@@ -220,7 +201,6 @@ uninstall:
 		echo cannot tell; \
 	fi; \
 	rm -rf /var/run/$(BIN)
-	rm -rf /var/lib/snapserver; \
 	$(MAKE) deluser
 
 endif
@@ -243,6 +223,5 @@ uninstallsystemd:
 	systemctl daemon-reload; \
 
 deluser:
-	@userdel --force snapserver > /dev/null || true; \
-	groupdel snapserver > /dev/null || true; \
+	@userdel --force snapclient > /dev/null || true; \
 

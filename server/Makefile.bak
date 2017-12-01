@@ -17,11 +17,6 @@
 VERSION = 0.12.0
 BIN = snapserver
 
-ifeq ($(TARGET), ARM)
-INC_PATH = ${SNAPCAST_INC_PATH}
-LIB_PATH = ${SNAPCAST_LIB_PATH}
-endif
-
 ifeq ($(TARGET), FREEBSD)
 SHELL   = /usr/local/bin/bash
 else
@@ -79,17 +74,9 @@ CXXFLAGS += -DFREEBSD -DHAS_BONJOUR -DHAS_DAEMON -Wno-deprecated -I/usr/local/in
 LDFLAGS  += -L/usr/local/lib -framework CoreFoundation -framework IOKit
 OBJ      += ../common/daemon.o publishZeroConf/publishBonjour.o
 
-else ifeq ($(TARGET), ARM)
-
-CXX       = ${CROSS_COMPILE}g++
-STRIP     = ${CROSS_COMPILE}strip
-CXXFLAGS += -I${INC_PATH} -DNO_CPP11_STRING -DHAS_AVAHI -DHAS_DAEMON -pthread
-LDFLAGS  += -L${LIB_PATH} -ldl -lasound -ldbus-1 -lopus -lvorbisidec -lavahi-client -lavahi-common -latomic 
-OBJ      += ../common/daemon.o publishZeroConf/publishAvahi.o
-
 else
 
-CXX       = $g++
+CXX       = ${CROSS_COMPILE}g++
 STRIP     = strip
 CXXFLAGS += -DHAS_AVAHI -DHAS_DAEMON -pthread
 LDFLAGS   = -lrt -lvorbis -lvorbisenc -logg -lFLAC -lavahi-client -lavahi-common -static-libgcc -static-libstdc++
