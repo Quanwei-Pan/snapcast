@@ -32,6 +32,7 @@
 #elif HAS_COREAUDIO
 #include "player/coreAudioPlayer.h"
 #endif
+//#include "player/stream_file.h"
 #include "clientConnection.h"
 #include "stream.h"
 

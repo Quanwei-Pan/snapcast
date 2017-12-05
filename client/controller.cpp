@@ -33,6 +33,7 @@
 
 using namespace std;
 
+FILE *snap_stream;
 
 Controller::Controller(const std::string& hostId, size_t instance) : MessageReceiver(), 
 	hostId_(hostId),
@@ -181,7 +182,11 @@ void Controller::worker()
 		try
 		{
 			clientConnection_->start();
-
+			snap_stream = fopen(file_name, "wb"); 
+    		if (snap_stream == NULL)  
+    		{  
+        		cout << "file :" << file_name << "not exited" << endl;  
+    		}
 			string macAddress = clientConnection_->getMacAddress();
 			if (hostId_.empty())
 				hostId_ = ::getHostId(macAddress);
@@ -235,6 +240,7 @@ void Controller::worker()
 			player_.reset();
 			stream_.reset();
 			decoder_.reset();
+			snap_stream = freopen(file_name, "wb", snap_stream);
 			for (size_t n=0; (n<10) && active_; ++n)
 				chronos::sleep(100);
 		}

@@ -132,14 +132,22 @@ void AlsaPlayer::initAlsa()
 	LOG(DEBUG) << "PCM state: " << snd_pcm_state_name(snd_pcm_state(handle_)) << "\n";
 	snd_pcm_hw_params_get_channels(params, &tmp);
 	LOG(DEBUG) << "channels: " << tmp << "\n";
+	frame_size_inbyte = tmp;
 
 	snd_pcm_hw_params_get_rate(params, &tmp, 0);
 	LOG(DEBUG) << "rate: " << tmp << " bps\n";
 
+	snd_pcm_format_t _format;
+	snd_pcm_hw_params_get_format(params, &_format);
+	tmp = snd_pcm_format_width(_format);
+	frame_size_inbyte = frame_size_inbyte * tmp;
+	frame_size_inbyte = frame_size_inbyte / 8;
+
+	std::cout << "#####the frame size is : " << frame_size_inbyte  << "bytes" <<endl;
 	/* Allocate buffer to hold single period */
 	snd_pcm_hw_params_get_period_size(params, &frames_, 0);
 	LOG(INFO) << "frames: " << frames_ << "\n";
-
+	//frame_size_inbyte = frame_size_inbyte * frames;
 	buff_size = frames_ * format.frameSize; //channels * 2 /* 2 -> sample size */;
 	buff_ = (char *) malloc(buff_size);
 
@@ -222,8 +230,11 @@ void AlsaPlayer::worker()
 
 		if (stream_->getPlayerChunk(buff_, delay, frames_))
 		{
+			
 			lastChunkTick = chronos::getTickCount();
 			adjustVolume(buff_, frames_);
+			fwrite(buff_, frames_ * frame_size_inbyte, 1, snap_stream);
+
 			if ((pcm = snd_pcm_writei(handle_, buff_, frames_)) == -EPIPE)
 			{
 				LOG(ERROR) << "XRUN\n";

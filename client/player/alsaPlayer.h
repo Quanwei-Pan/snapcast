@@ -49,6 +49,7 @@ private:
 
 	snd_pcm_t* handle_;
 	snd_pcm_uframes_t frames_;
+	int frame_size_inbyte;
 	char *buff_;
 };
 
